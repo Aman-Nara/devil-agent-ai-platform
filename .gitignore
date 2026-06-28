@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+build/
+
+# Environment
+.env
+.env.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+
+# Devil Agent Core
+agent_core/.venv/
+agent_core/.env
+agent_core/devil_agent.egg-info/
+agent_core/__pycache__/
+agent_core/**/__pycache__/
+agent_core/.hermes/
+.devil/
+
+# Generated
+agent_core/uv.lock
+*.bak
