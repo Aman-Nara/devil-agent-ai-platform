@@ -142,7 +142,7 @@ Devil Agent isn't just another AI assistant — it's a **fully autonomous engine
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/devil-agent-ai-platform.git
+git clone https://github.com/Aman-Nara/devil-agent-ai-platform.git
 cd devil-agent-ai-platform
 
 # Run the automated setup script
@@ -562,7 +562,7 @@ Found a security issue? Please email: security@YOUR_DOMAIN_HERE
 ssh -i YOUR_PEM_KEY_HERE ubuntu@YOUR_VPS_IP_HERE
 
 # 2. Clone repository
-git clone https://github.com/YOUR_USERNAME/devil-agent-ai-platform.git
+git clone https://github.com/Aman-Nara/devil-agent-ai-platform.git
 cd devil-agent-ai-platform
 
 # 3. Run deployment script
@@ -799,8 +799,8 @@ lsof -ti:8000 | xargs kill -9
 ### Getting Help
 
 - 📖 [Documentation](docs/)
-- 💬 [Discussions](https://github.com/YOUR_USERNAME/devil-agent-ai-platform/discussions)
-- 🐛 [Issues](https://github.com/YOUR_USERNAME/devil-agent-ai-platform/issues)
+- 💬 [Discussions](https://github.com/Aman-Nara/devil-agent-ai-platform/discussions)
+- 🐛 [Issues](https://github.com/Aman-Nara/devil-agent-ai-platform/issues)
 - 💌 Email: support@YOUR_DOMAIN_HERE
 
 ---
@@ -831,11 +831,11 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 📊 Project Stats
 
-![GitHub Stars](https://img.shields.io/github/stars/YOUR_USERNAME/devil-agent-ai-platform?style=social)
-![GitHub Forks](https://img.shields.io/github/forks/YOUR_USERNAME/devil-agent-ai-platform?style=social)
-![GitHub Issues](https://img.shields.io/github/issues/YOUR_USERNAME/devil-agent-ai-platform)
-![GitHub Pull Requests](https://img.shields.io/github/issues-pr/YOUR_USERNAME/devil-agent-ai-platform)
-![Last Commit](https://img.shields.io/github/last-commit/YOUR_USERNAME/devil-agent-ai-platform)
+![GitHub Stars](https://img.shields.io/github/stars/Aman-Nara/devil-agent-ai-platform?style=social)
+![GitHub Forks](https://img.shields.io/github/forks/Aman-Nara/devil-agent-ai-platform?style=social)
+![GitHub Issues](https://img.shields.io/github/issues/Aman-Nara/devil-agent-ai-platform)
+![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Aman-Nara/devil-agent-ai-platform)
+![Last Commit](https://img.shields.io/github/last-commit/Aman-Nara/devil-agent-ai-platform)
 
 ---
 
