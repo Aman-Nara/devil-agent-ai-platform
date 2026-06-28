@@ -1,0 +1,606 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Flame, MessageSquare, Code, Settings, LogOut, Send, Plus, Trash2, Save, X, Menu, ChevronLeft } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+
+const API_URL = process.env.REACT_APP_API_URL || '';
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  message_count: number;
+  created_at: string;
+}
+
+interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  code: string;
+  is_public: boolean;
+  created_at: string;
+}
+
+interface UserProfile {
+  id: string;
+  tier: string;
+  has_nvidia_key: boolean;
+  nvidia_key_preview: string | null;
+  created_at: string;
+  last_login: string;
+}
+
+const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'chat' | 'skills' | 'settings'>('chat');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  // Chat state
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Skills state
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
+  const [newSkill, setNewSkill] = useState({ name: '', description: '', code: '', is_public: false });
+  const [showNewSkillForm, setShowNewSkillForm] = useState(false);
+
+  // Settings state
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [nvidiaKey, setNvidiaKey] = useState('');
+
+  const token = localStorage.getItem('devil_token');
+
+  const authHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+
+  useEffect(() => {
+    loadConversations();
+    loadSkills();
+    loadProfile();
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const loadConversations = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/conversations`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        setConversations(data.conversations || []);
+      }
+    } catch (err) {
+      console.error('Failed to load conversations:', err);
+    }
+  };
+
+  const loadConversation = async (id: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/conversations/${id}`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(Array.isArray(data?.messages) ? data.messages : []);
+        setCurrentConversationId(id);
+      }
+    } catch (err) {
+      console.error('Failed to load conversation:', err);
+    }
+  };
+
+  const deleteConversation = async (id: string) => {
+    try {
+      await fetch(`${API_URL}/api/conversations/${id}`, { method: 'DELETE', headers: authHeaders });
+      setConversations(prev => prev.filter(c => c.id !== id));
+      if (currentConversationId === id) {
+        setCurrentConversationId(null);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!inputMessage.trim() || chatLoading) return;
+
+    const userMessage = inputMessage;
+    setInputMessage('');
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setChatLoading(true);
+
+    try {
+      const res = await fetch(`${API_URL}/api/chat`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          message: userMessage,
+          conversation_id: currentConversationId
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.messages);
+        setCurrentConversationId(data.conversation_id);
+        loadConversations();
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${errorData.detail || 'Failed to get response'}` }]);
+      }
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Error: Network error' }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const newChat = () => {
+    setCurrentConversationId(null);
+    setMessages([]);
+  };
+
+  // Skills functions
+  const loadSkills = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/skills`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        setSkills(Array.isArray(data) ? data : data.skills || []);
+      }
+    } catch (err) {
+      console.error('Failed to load skills:', err);
+    }
+  };
+
+  const createSkill = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/skills`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify(newSkill)
+      });
+      if (res.ok) {
+        setNewSkill({ name: '', description: '', code: '', is_public: false });
+        setShowNewSkillForm(false);
+        loadSkills();
+      }
+    } catch (err) {
+      console.error('Failed to create skill:', err);
+    }
+  };
+
+  const updateSkill = async () => {
+    if (!editingSkill) return;
+    try {
+      await fetch(`${API_URL}/api/skills/${editingSkill.id}`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify(editingSkill)
+      });
+      setEditingSkill(null);
+      loadSkills();
+    } catch (err) {
+      console.error('Failed to update skill:', err);
+    }
+  };
+
+  const deleteSkill = async (id: string) => {
+    try {
+      await fetch(`${API_URL}/api/skills/${id}`, { method: 'DELETE', headers: authHeaders });
+      loadSkills();
+    } catch (err) {
+      console.error('Failed to delete skill:', err);
+    }
+  };
+
+  // Settings functions
+  const loadProfile = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/user/profile`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data);
+      }
+    } catch (err) {
+      console.error('Failed to load profile:', err);
+    }
+  };
+
+  const saveNvidiaKey = async () => {
+    try {
+      await fetch(`${API_URL}/api/user/nvidia-key`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ nvidia_api_key: nvidiaKey })
+      });
+      setNvidiaKey('');
+      loadProfile();
+    } catch (err) {
+      console.error('Failed to save NVIDIA key:', err);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('devil_token');
+    localStorage.removeItem('devil_user_id');
+    navigate('/');
+  };
+
+  const tabs = [
+    { id: 'chat' as const, label: 'Chat', icon: MessageSquare },
+    { id: 'skills' as const, label: 'Skills', icon: Code },
+    { id: 'settings' as const, label: 'Settings', icon: Settings },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] flex">
+      {/* Sidebar */}
+      <div className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-[#0d0d0d] border-r border-[#1a1a1a] flex flex-col transition-all duration-300`}>
+        {/* Logo */}
+        <div className="p-4 border-b border-[#1a1a1a] flex items-center justify-between">
+          <div className={`flex items-center gap-2 ${!sidebarOpen && 'justify-center'}`}>
+            <Flame className="w-8 h-8 text-[#FF4444]" />
+            {sidebarOpen && <span className="text-lg font-bold text-white">Devil</span>}
+          </div>
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-400 hover:text-white">
+            {sidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 p-2">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-[#FF4444]/20 text-[#FF4444]'
+                  : 'text-gray-400 hover:bg-[#1a1a1a] hover:text-white'
+              }`}
+            >
+              <tab.icon className="w-5 h-5" />
+              {sidebarOpen && <span>{tab.label}</span>}
+            </button>
+          ))}
+        </nav>
+
+        {/* Logout */}
+        <div className="p-2 border-t border-[#1a1a1a]">
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            {sidebarOpen && <span>Logout</span>}
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex">
+        {/* Chat Tab */}
+        {activeTab === 'chat' && (
+          <>
+            {/* Conversations sidebar */}
+            <div className="w-72 bg-[#0d0d0d] border-r border-[#1a1a1a] flex flex-col">
+              <div className="p-4 border-b border-[#1a1a1a]">
+                <button
+                  onClick={newChat}
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-[#FF4444] to-[#FF8C00] text-white rounded-lg hover:opacity-90"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Chat
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
+                {(conversations || []).map(conv => (
+                  <div
+                    key={conv.id}
+                    className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer mb-1 ${
+                      currentConversationId === conv.id
+                        ? 'bg-[#1a1a1a]'
+                        : 'hover:bg-[#1a1a1a]'
+                    }`}
+                    onClick={() => loadConversation(conv.id)}
+                  >
+                    <span className="text-sm text-white truncate flex-1">{conv.title}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Chat area */}
+            <div className="flex-1 flex flex-col">
+              <div className="flex-1 overflow-y-auto p-6">
+                {(messages || []).length === 0 ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <Flame className="w-16 h-16 text-[#FF4444] mx-auto mb-4 opacity-50" />
+                      <p className="text-gray-500">Start a conversation with Devil Agent</p>
+                      <p className="text-gray-600 text-sm mt-2">Powered by Qwen 80B</p>
+                    </div>
+                  </div>
+                ) : (
+                  (messages || []).map((msg, idx) => (
+                    <div key={idx} className={`mb-6 ${msg.role === 'user' ? 'text-right' : ''}`}>
+                      <div className={`inline-block max-w-3xl p-4 rounded-lg ${
+                        msg.role === 'user'
+                          ? 'bg-gradient-to-r from-[#FF4444] to-[#FF8C00] text-white'
+                          : 'bg-[#1a1a1a] text-white'
+                      }`}>
+                        {msg.role === 'assistant' ? (
+                          <div className="markdown-content">
+                            <ReactMarkdown
+                              components={{
+                                code({ node, inline, className, children, ...props }: any) {
+                                  const match = /language-(\w+)/.exec(className || '');
+                                  return !inline && match ? (
+                                    <SyntaxHighlighter
+                                      style={vscDarkPlus as any}
+                                      language={match[1]}
+                                      PreTag="div"
+                                      {...props}
+                                    >
+                                      {String(children).replace(/\n$/, '')}
+                                    </SyntaxHighlighter>
+                                  ) : (
+                                    <code className={className} {...props}>
+                                      {children}
+                                    </code>
+                                  );
+                                }
+                              }}
+                            >
+                              {msg.content}
+                            </ReactMarkdown>
+                          </div>
+                        ) : (
+                          <p>{msg.content}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+                {chatLoading && (
+                  <div className="mb-6">
+                    <div className="inline-block bg-[#1a1a1a] p-4 rounded-lg">
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 bg-[#FF4444] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 bg-[#FF8C00] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 bg-[#FF4444] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input */}
+              <div className="p-4 border-t border-[#1a1a1a]">
+                <div className="flex gap-4">
+                  <input
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                    placeholder="Type your message..."
+                    className="flex-1 bg-[#1a1a1a] border border-[#333] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-[#FF4444] focus:outline-none"
+                  />
+                  <button
+                    onClick={sendMessage}
+                    disabled={chatLoading || !inputMessage.trim()}
+                    className="px-6 py-3 bg-gradient-to-r from-[#FF4444] to-[#FF8C00] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Skills Tab */}
+        {activeTab === 'skills' && (
+          <div className="flex-1 p-6 overflow-y-auto">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-white">Your Skills</h2>
+                <button
+                  onClick={() => setShowNewSkillForm(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#FF4444] to-[#FF8C00] text-white rounded-lg hover:opacity-90"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Skill
+                </button>
+              </div>
+
+              {showNewSkillForm && (
+                <div className="bg-[#1a1a1a] rounded-lg p-6 mb-6 border border-[#333]">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-white">Create New Skill</h3>
+                    <button onClick={() => setShowNewSkillForm(false)} className="text-gray-400 hover:text-white">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={newSkill.name}
+                    onChange={(e) => setNewSkill({ ...newSkill, name: e.target.value })}
+                    placeholder="Skill name"
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded-lg px-4 py-2 text-white mb-4 focus:border-[#FF4444] focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    value={newSkill.description}
+                    onChange={(e) => setNewSkill({ ...newSkill, description: e.target.value })}
+                    placeholder="Description"
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded-lg px-4 py-2 text-white mb-4 focus:border-[#FF4444] focus:outline-none"
+                  />
+                  <textarea
+                    value={newSkill.code}
+                    onChange={(e) => setNewSkill({ ...newSkill, code: e.target.value })}
+                    placeholder="Skill code..."
+                    rows={10}
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded-lg px-4 py-2 text-white mb-4 font-mono text-sm focus:border-[#FF4444] focus:outline-none"
+                  />
+                  <button
+                    onClick={createSkill}
+                    className="px-6 py-2 bg-gradient-to-r from-[#FF4444] to-[#FF8C00] text-white rounded-lg hover:opacity-90"
+                  >
+                    Create Skill
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {(skills || []).map(skill => (
+                  <div key={skill.id} className="bg-[#1a1a1a] rounded-lg p-6 border border-[#333]">
+                    {editingSkill?.id === skill.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editingSkill.name}
+                          onChange={(e) => setEditingSkill({ ...editingSkill, name: e.target.value })}
+                          className="w-full bg-[#0a0a0a] border border-[#333] rounded-lg px-4 py-2 text-white mb-4 focus:border-[#FF4444] focus:outline-none"
+                        />
+                        <textarea
+                          value={editingSkill.code}
+                          onChange={(e) => setEditingSkill({ ...editingSkill, code: e.target.value })}
+                          rows={10}
+                          className="w-full bg-[#0a0a0a] border border-[#333] rounded-lg px-4 py-2 text-white mb-4 font-mono text-sm focus:border-[#FF4444] focus:outline-none"
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={updateSkill} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            <Save className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => setEditingSkill(null)} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h3 className="text-lg font-semibold text-white">{skill.name}</h3>
+                            <p className="text-gray-400 text-sm">{skill.description}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => setEditingSkill(skill)} className="text-gray-400 hover:text-[#FF8C00]">
+                              <Code className="w-5 h-5" />
+                            </button>
+                            <button onClick={() => deleteSkill(skill.id)} className="text-gray-400 hover:text-red-400">
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                        {skill.code && (
+                          <pre className="bg-[#0a0a0a] rounded-lg p-4 text-sm text-gray-300 overflow-x-auto">
+                            {skill.code.substring(0, 200)}{skill.code.length > 200 ? '...' : ''}
+                          </pre>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))}
+                {(skills || []).length === 0 && !showNewSkillForm && (
+                  <div className="text-center py-12">
+                    <Code className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-500">No skills yet. Create your first skill!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="flex-1 p-6 overflow-y-auto">
+            <div className="max-w-2xl mx-auto">
+              <h2 className="text-2xl font-bold text-white mb-6">Settings</h2>
+
+              {/* Profile Section */}
+              {profile && (
+                <div className="bg-[#1a1a1a] rounded-lg p-6 mb-6 border border-[#333]">
+                  <h3 className="text-lg font-semibold text-white mb-4">Profile</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">User ID</span>
+                      <span className="text-white font-mono">{profile.id.substring(0, 12)}...</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Tier</span>
+                      <span className="text-[#FF8C00] font-semibold uppercase">{profile.tier}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Created</span>
+                      <span className="text-white">{new Date(profile.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Last Login</span>
+                      <span className="text-white">{new Date(profile.last_login).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* NVIDIA API Key */}
+              <div className="bg-[#1a1a1a] rounded-lg p-6 border border-[#333]">
+                <h3 className="text-lg font-semibold text-white mb-4">NVIDIA API Key</h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  Add your personal NVIDIA API key for custom model access.
+                </p>
+                {profile?.has_nvidia_key && (
+                  <p className="text-green-400 text-sm mb-4">
+                    Current key: {profile.nvidia_key_preview}
+                  </p>
+                )}
+                <div className="flex gap-4">
+                  <input
+                    type="password"
+                    value={nvidiaKey}
+                    onChange={(e) => setNvidiaKey(e.target.value)}
+                    placeholder="Enter NVIDIA API key (nvapi-...)"
+                    className="flex-1 bg-[#0a0a0a] border border-[#333] rounded-lg px-4 py-2 text-white focus:border-[#FF4444] focus:outline-none"
+                  />
+                  <button
+                    onClick={saveNvidiaKey}
+                    disabled={!nvidiaKey}
+                    className="px-6 py-2 bg-gradient-to-r from-[#FF4444] to-[#FF8C00] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
