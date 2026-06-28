@@ -879,14 +879,8 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ---
 
-## 🌐 Community
 
-- **Discord**: [Join our community](https://discord.gg/YOUR_INVITE)
-- **Twitter**: [@DevilAgentAI](https://twitter.com/YOUR_HANDLE)
-- **Blog**: [blog.YOUR_DOMAIN_HERE](https://blog.YOUR_DOMAIN_HERE)
-- **YouTube**: [Video tutorials](https://youtube.com/YOUR_CHANNEL)
 
----
 
 ## 📣 Tags
 
